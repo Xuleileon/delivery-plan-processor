@@ -9,6 +9,8 @@ class ExcelPreprocessor:
         
     def process(self, input_file: Path) -> Path:
         """预处理Excel文件"""
+        excel = None
+        workbook = None
         try:
             excel = win32com.client.DispatchEx('Excel.Application')
             excel.DisplayAlerts = False
@@ -24,16 +26,19 @@ class ExcelPreprocessor:
             self._clean_sheets(workbook, sheets_to_keep)
             
             # 保存结果
-            output_path = generate_output_path(input_file, "预处理")
-            workbook.SaveAs(str(output_path))
-            workbook.Close()
-            excel.Quit()
+            output_path = generate_output_path(input_file, Path("output"), "预处理")
+            workbook.SaveAs(str(output_path.absolute()))
             
             return output_path
             
         except Exception as e:
             self.logger.error(f"预处理失败: {str(e)}", exc_info=True)
             raise
+        finally:
+            if workbook:
+                workbook.Close(SaveChanges=False)
+            if excel:
+                excel.Quit()
             
     def _calculate_sheets(self, workbook, sheet_names):
         """计算指定工作表的公式"""
@@ -42,7 +47,7 @@ class ExcelPreprocessor:
             sheet.Calculate()
             used_range = sheet.UsedRange
             used_range.Copy()
-            used_range.PasteSpecial(Paste=-4163)
+            used_range.PasteSpecial(Paste=-4163)  # xlPasteValues
             
     def _clean_sheets(self, workbook, sheets_to_keep):
         """清理多余的工作表"""

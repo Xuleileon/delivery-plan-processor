@@ -19,7 +19,7 @@ class SKUMerger:
             merged_df = self._merge_duplicates(df)
             
             # 保存结果
-            output_path = generate_output_path(input_file, "合并")
+            output_path = generate_output_path(input_file, Path("output"), "合并")
             self._save_result(merged_df, output_path)
             
             self._log_results(df, merged_df, duplicates)
@@ -35,4 +35,29 @@ class SKUMerger:
             df[col] = df[col].apply(format_sku)
         return df
         
-    # ... 其他具体实现方法 ... 
+    def _find_duplicates(self, df):
+        """查找重复的SKU"""
+        return df[df.duplicated(subset=['sku编码'], keep=False)]
+        
+    def _merge_duplicates(self, df):
+        """合并重复的SKU"""
+        # 按SKU分组并合并数量
+        numeric_cols = df.columns[df.columns.str.contains('数量|交货量')]
+        agg_dict = {col: 'sum' for col in numeric_cols}
+        
+        # 保留其他列的第一个值
+        for col in df.columns:
+            if col not in numeric_cols:
+                agg_dict[col] = 'first'
+                
+        return df.groupby('sku编码', as_index=False).agg(agg_dict)
+        
+    def _save_result(self, df, output_path):
+        """保存结果"""
+        df.to_excel(output_path, index=False, sheet_name='汇总')
+        
+    def _log_results(self, original_df, merged_df, duplicates):
+        """记录处理结果"""
+        self.logger.info(f"原始记录数: {len(original_df)}")
+        self.logger.info(f"合并后记录数: {len(merged_df)}")
+        self.logger.info(f"重复SKU数: {len(duplicates)}")
