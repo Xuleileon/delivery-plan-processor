@@ -1,0 +1,16 @@
+excel:
+  sheets_to_keep:
+    - 常规产品
+    - S级产品
+    - 汇总
+  date_format: '%Y%m%d_%H%M%S'
+  
+styles:
+  header:
+    green: '1F6B3B'
+    orange: 'F4B183'
+  
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file_pattern: 'logs/excel_processor_%Y%m%d.log' 
