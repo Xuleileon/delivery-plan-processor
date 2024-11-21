@@ -9,6 +9,11 @@ class ExcelPreprocessor:
         
     def process(self, input_file: Path) -> Path:
         """预处理Excel文件"""
+        # 首先检查文件是否存在
+        if not input_file.exists():
+            self.logger.error(f"文件不存在: {input_file}")
+            raise FileNotFoundError(f"文件不存在: {input_file}")
+            
         excel = None
         workbook = None
         try:
@@ -26,7 +31,7 @@ class ExcelPreprocessor:
             self._clean_sheets(workbook, sheets_to_keep)
             
             # 保存结果
-            output_path = generate_output_path(input_file, Path("output"), "预处理")
+            output_path = Path("output") / f"{input_file.stem}_预处理.xlsx"
             workbook.SaveAs(str(output_path.absolute()))
             
             return output_path
