@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include requirements.txt
+include pytest.ini
+include .flake8
+include pyproject.toml
+
+recursive-include config *.yaml
+recursive-include tests *.py
+recursive-include docs *.rst *.py *.bat *.txt *.png *.css *.html
+recursive-exclude * __pycache__
+recursive-exclude * *.py[cod] 
