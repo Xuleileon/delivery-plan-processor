@@ -64,7 +64,70 @@ class TestExcelPreprocessor:
         # 验证输出
         assert result.exists()
         
-        # 验证输出文件包含所需的工作表
+        # 验证输出文件内容
         import openpyxl
         wb = openpyxl.load_workbook(result)
+        
+        # 验证工作表
         assert set(wb.sheetnames) == {'常规产品', 'S级产品', '汇总'}
+        
+        # 验证表头
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            assert ws['A1'].value == 'SKU编码'
+            assert ws['B1'].value == '数量'
+        
+        # 打印处理后的文件路径
+        print(f"\n处理后的文件保存在: {result.absolute()}")
+    
+    @pytest.fixture
+    def sample_excel_with_data(self, tmp_path):
+        """创建一个包含测试数据的Excel文件"""
+        import openpyxl
+        wb = openpyxl.Workbook()
+        
+        # 创建测试工作表并添加数据
+        data = {
+            '常规产品': [
+                ['SKU编码', '数量', '日期'],
+                ['SKU001', 100, '2024-01-01'],
+                ['SKU002', 200, '2024-01-02'],
+            ],
+            'S级产品': [
+                ['SKU编码', '数量', '日期'],
+                ['SKU003', 300, '2024-01-01'],
+                ['SKU004', 400, '2024-01-02'],
+            ],
+            '汇总': [
+                ['SKU编码', '总数量', '最早日期'],
+                ['=常规产品!A2', '=SUM(常规产品!B2:B3)', '=MIN(常规产品!C2:C3)'],
+                ['=S级产品!A2', '=SUM(S级产品!B2:B3)', '=MIN(S级产品!C2:C3)'],
+            ]
+        }
+        
+        for sheet_name, sheet_data in data.items():
+            ws = wb.create_sheet(sheet_name)
+            for row in sheet_data:
+                ws.append(row)
+        
+        # 删除默认的Sheet
+        wb.remove(wb['Sheet'])
+        
+        # 保存测试文件
+        test_file = tmp_path / "sample_excel_with_data.xlsx"
+        wb.save(test_file)
+        return test_file
+    
+    def test_process_with_real_data(self, preprocessor, sample_excel_with_data):
+        """测试处理真实数据"""
+        result = preprocessor.process(sample_excel_with_data)
+        
+        # 验证输出
+        wb = openpyxl.load_workbook(result)
+        
+        # 验证汇总表的计算结果
+        summary = wb['汇总']
+        assert summary['B2'].value == 300  # 常规产品总数
+        assert summary['B3'].value == 700  # S级产品总数
+        
+        print(f"\n包含实际数据的处理结果保存在: {result.absolute()}")
