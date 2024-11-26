@@ -1,0 +1,42 @@
+excel:
+  sheets:
+    # 需要处理的工作表
+    process:
+      - name: "常规产品"
+        type: "regular"
+      - name: "S级产品"
+        type: "s_level"
+      - name: "汇总"
+        type: "summary"
+    
+    # 保留的工作表（其他会被删除）
+    keep:
+      - "常规产品"
+      - "S级产品"
+      - "汇总"
+
+  # 表头样式配置
+  header_styles:
+    basic_columns:
+      - "编码"
+      - "名称"
+      - "规格"
+      - "数量"
+    colors:
+      basic: "1F6B3B"  # 基础列的颜色（绿色）
+      other: "F4B183"  # 其他列的颜色（橙色）
+
+# 输出文件配置
+output:
+  directory: "output"
+  suffixes:
+    preprocess: "预处理"
+    transform: "转换"
+    merge: "合并"
+
+# 日期格式配置
+date:
+  input_formats:
+    - "%Y-%m-%d"
+    - "%Y/%m/%d"
+  output_format: "yyyy-mm-dd"

@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, Union, Tuple
+from typing import Dict, Union, Tuple, Any
 import yaml
 from src.preprocessor.excel_preprocessor import ExcelPreprocessor
 from src.transformer.delivery_plan_transformer import DeliveryPlanTransformer
@@ -36,15 +36,11 @@ def process_delivery_plan(
     logger = logging.getLogger(__name__)
     
     try:
-        # 加载配置
-        if config_path:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f)
-        else:
-            config = {}
-        
-        # 处理输入路径
+        # 检查文件路径
         input_file = Path(input_file_path)
+        logger.info(f"检查文件路径: {input_file}")
+        logger.info(f"文件是否存在: {input_file.exists()}")
+        
         if not input_file.exists():
             raise FileNotFoundError(f"输入文件不存在: {input_file_path}")
             
@@ -52,19 +48,19 @@ def process_delivery_plan(
         output_dir = Path(output_dir) if output_dir else input_file.parent
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # 1. 预处理阶段
-        preprocessor = ExcelPreprocessor(config.get('excel', {}))
-        preprocessed_file = preprocessor.process(input_file, output_dir)
+        # 1. 预处理阶段 - 处理Excel公式和格式
+        preprocessor = ExcelPreprocessor()
+        preprocessed_file = preprocessor.process(input_file)
         logger.info(f"预处理完成: {preprocessed_file}")
 
-        # 2. 转换阶段
-        transformer = DeliveryPlanTransformer(config.get('transformer', {}))
-        transformed_file = transformer.transform(preprocessed_file, output_dir)
+        # 2. 转换阶段 - 转换数据格式
+        transformer = DeliveryPlanTransformer()
+        transformed_file = transformer.transform(preprocessed_file)
         logger.info(f"转换完成: {transformed_file}")
 
-        # 3. 合并阶段
-        merger = SKUMerger(config.get('merger', {}))
-        final_file = merger.merge(transformed_file, output_dir)
+        # 3. 合并阶段 - 合并SKU数据
+        merger = SKUMerger()
+        final_file = merger.merge(transformed_file)
         logger.info(f"合并完成: {final_file}")
 
         result = {

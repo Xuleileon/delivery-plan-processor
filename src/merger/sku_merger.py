@@ -10,8 +10,8 @@ class SKUMerger:
     def merge(self, input_file: Path) -> Path:
         """合并SKU数据"""
         try:
-            # 读取数据
-            df = pd.read_excel(input_file, sheet_name='汇总', dtype=str)
+            # 读取数据，不指定dtype，让pandas自动推断类型
+            df = pd.read_excel(input_file, sheet_name='汇总')
             
             # 处理数据
             df = self._format_data(df)
@@ -31,26 +31,42 @@ class SKUMerger:
             
     def _format_data(self, df):
         """格式化数据"""
-        for col in df.columns:
-            df[col] = df[col].apply(format_sku)
+        # 只对SKU相关列应用format_sku
+        sku_cols = ['sku_no']
+        for col in sku_cols:
+            if col in df.columns:
+                df[col] = df[col].apply(format_sku)
         return df
         
     def _find_duplicates(self, df):
-        """查找重复的SKU"""
-        return df[df.duplicated(subset=['sku编码'], keep=False)]
+        """找出重复的SKU"""
+        return df[df.duplicated(subset=['sku_no'], keep=False)]
         
     def _merge_duplicates(self, df):
         """合并重复的SKU"""
-        # 按SKU分组并合并数量
-        numeric_cols = df.columns[df.columns.str.contains('数量|交货量')]
-        agg_dict = {col: 'sum' for col in numeric_cols}
+        # 识别需要合并的列
+        date_cols = [col for col in df.columns if col.startswith('day')]
+        sum_cols = date_cols
+        first_cols = ['sku_no', 'color', 'size']
         
-        # 保留其他列的第一个值
+        # 构建聚合字典
+        agg_dict = {}
         for col in df.columns:
-            if col not in numeric_cols:
+            if col in sum_cols:
+                agg_dict[col] = 'sum'
+            elif col in first_cols:
                 agg_dict[col] = 'first'
-                
-        return df.groupby('sku编码', as_index=False).agg(agg_dict)
+            elif col == 'dt':
+                agg_dict[col] = 'first'
+        
+        # 按SKU分组并合并
+        merged_df = df.groupby('sku_no', as_index=False).agg(agg_dict)
+        
+        # 确保数值列为float类型
+        for col in date_cols:
+            merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0.0)
+            
+        return merged_df
         
     def _save_result(self, df, output_path):
         """保存结果"""

@@ -1,4 +1,5 @@
 import pytest
+import openpyxl
 from pathlib import Path
 from src.preprocessor.excel_preprocessor import ExcelPreprocessor
 from src.utils.excel_utils import setup_logging
@@ -46,7 +47,7 @@ class TestExcelPreprocessor:
     
     def test_process_invalid_file(self, preprocessor):
         """测试处理不存在的文件"""
-        with pytest.raises(FileNotFoundError, match="文件不存在"):
+        with pytest.raises(FileOperationError, match="输入文件不存在"):
             preprocessor.process(Path("not_exists.xlsx"))
     
     @pytest.mark.slow
@@ -127,7 +128,20 @@ class TestExcelPreprocessor:
         
         # 验证汇总表的计算结果
         summary = wb['汇总']
-        assert summary['B2'].value == 300  # 常规产品总数
-        assert summary['B3'].value == 700  # S级产品总数
+        
+        # 打印实际值以便调试
+        print(f"\n汇总表数据:")
+        for row in summary.iter_rows(min_row=1, max_row=3, values_only=True):
+            print(row)
+        
+        # 验证常规产品总数
+        assert summary['B2'].value == 300, f"常规产品总数错误，期望300，实际{summary['B2'].value}"
+        
+        # 验证S级产品总数
+        assert summary['B3'].value == 700, f"S级产品总数错误，期望700，实际{summary['B3'].value}"
+        
+        # 验证日期
+        assert summary['C2'].value == '2024-01-01', f"常规产品最早日期错误，期望2024-01-01，实际{summary['C2'].value}"
+        assert summary['C3'].value == '2024-01-01', f"S级产品最早日期错误，期望2024-01-01，实际{summary['C3'].value}"
         
         print(f"\n包含实际数据的处理结果保存在: {result.absolute()}")
