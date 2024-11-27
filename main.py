@@ -60,17 +60,20 @@ def process_delivery_plan(
         else:
             # 从飞书获取数据
             logger.info("从飞书获取数据...")
-            downloader = FeishuSheetDownloader()
+            downloader = FeishuSheetDownloader(
+                app_id=config['feishu']['app_id'],
+                app_secret=config['feishu']['app_secret']
+            )
             
             # 构建sheet URLs
             sheet_urls = []
             spreadsheet_token = config['feishu']['spreadsheet_token']
-            for sheet in config['feishu']['sheets']:
-                url = f"https://fr1r3d1ckr.feishu.cn/sheets/{spreadsheet_token}?sheet={sheet['sheet_id']}"
-                sheet_urls.append(url)
+            sheet_config = config['feishu']['sheets']
+            url = f"https://fr1r3d1ckr.feishu.cn/sheets/{spreadsheet_token}"
+            sheet_urls.append(url)
             
             # 下载并保存为Excel文件
-            initial_file = Path(downloader.download_sheets(sheet_urls))
+            initial_file = Path(downloader.download_sheets(sheet_urls, sheet_config))
             logger.info(f"飞书数据已保存到: {initial_file}")
         
         # 1. 预处理阶段 - 处理Excel公式和格式

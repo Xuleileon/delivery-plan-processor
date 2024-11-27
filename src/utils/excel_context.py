@@ -6,6 +6,7 @@ import win32com.client
 from contextlib import contextmanager
 from src.core.exceptions import ExcelOperationError
 from pathlib import Path
+import pythoncom
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,9 @@ def excel_context(visible: bool = False, display_alerts: bool = False):
     """
     excel = None
     try:
+        # 初始化COM
+        pythoncom.CoInitialize()
+        
         # 使用GetActiveObject尝试获取已存在的Excel实例
         try:
             excel = win32com.client.GetActiveObject('Excel.Application')
@@ -53,6 +57,9 @@ def excel_context(visible: bool = False, display_alerts: bool = False):
                 logger.debug("Excel应用程序已关闭")
             except:
                 logger.warning("关闭Excel应用程序时出错", exc_info=True)
+            finally:
+                # 取消初始化COM
+                pythoncom.CoUninitialize()
 
 @contextmanager
 def workbook_context(excel_app, file_path: str, read_only: bool = False):

@@ -103,8 +103,14 @@ class DeliveryPlanTransformer:
             # 处理常规产品数据
             regular_data = {}
             for _, row in regular_df.iterrows():
-                sku = row['sku编码']
-                if pd.isna(sku):
+                # 尝试不同的列名
+                sku = None
+                for col_name in ['sku编码', 'SKU编码', 'sku_no']:
+                    if col_name in row.index:
+                        sku = row[col_name]
+                        break
+                
+                if sku is None or pd.isna(sku):
                     continue
                     
                 if sku not in regular_data:
@@ -115,9 +121,15 @@ class DeliveryPlanTransformer:
                     }
                     
                 # 从规格提取颜色和尺码
-                if pd.notna(row.get('规格')):
-                    color_match = re.search(r'颜色[:：\s]*([^,，\s]+)', str(row['规格']))
-                    size_match = re.search(r'尺码[:：\s]*([^,，\s]+)', str(row['规格']))
+                spec_col = None
+                for col_name in ['规格', '商品规格']:
+                    if col_name in row.index:
+                        spec_col = col_name
+                        break
+                
+                if spec_col and pd.notna(row[spec_col]):
+                    color_match = re.search(r'颜色[:：\s]*([^,，\s]+)', str(row[spec_col]))
+                    size_match = re.search(r'尺码[:：\s]*([^,，\s]+)', str(row[spec_col]))
                     regular_data[sku]['color'] = color_match.group(1) if color_match else ''
                     regular_data[sku]['size'] = size_match.group(1) if size_match else ''
                 
@@ -125,7 +137,7 @@ class DeliveryPlanTransformer:
                 for i in range(1, 6):
                     date_col = f'到货批次-{i}'
                     qty_col = f'到货数量-{i}'
-                    if date_col in row and qty_col in row:
+                    if date_col in row.index and qty_col in row.index:
                         try:
                             date = row[date_col]
                             qty = row[qty_col]
@@ -147,8 +159,14 @@ class DeliveryPlanTransformer:
             # 处理S级产品数据
             s_level_data = {}
             for _, row in s_level_df.iterrows():
-                sku = row['sku编码']
-                if pd.isna(sku):
+                # 尝试不同的列名
+                sku = None
+                for col_name in ['sku编码', 'SKU编码', 'sku_no']:
+                    if col_name in row.index:
+                        sku = row[col_name]
+                        break
+                
+                if sku is None or pd.isna(sku):
                     continue
                     
                 if sku not in s_level_data:
@@ -159,9 +177,15 @@ class DeliveryPlanTransformer:
                     }
                     
                 # 从规格提取颜色和尺码
-                if pd.notna(row.get('规格')):
-                    color_match = re.search(r'颜色[:：\s]*([^,，\s]+)', str(row['规格']))
-                    size_match = re.search(r'尺码[:：\s]*([^,，\s]+)', str(row['规格']))
+                spec_col = None
+                for col_name in ['规格', '商品规格']:
+                    if col_name in row.index:
+                        spec_col = col_name
+                        break
+                
+                if spec_col and pd.notna(row[spec_col]):
+                    color_match = re.search(r'颜色[:：\s]*([^,，\s]+)', str(row[spec_col]))
+                    size_match = re.search(r'尺码[:：\s]*([^,，\s]+)', str(row[spec_col]))
                     s_level_data[sku]['color'] = color_match.group(1) if color_match else ''
                     s_level_data[sku]['size'] = size_match.group(1) if size_match else ''
                 

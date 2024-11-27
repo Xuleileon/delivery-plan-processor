@@ -51,72 +51,91 @@ class ExcelPreprocessor:
             return output_path
             
         except Exception as e:
-            raise ExcelOperationError(f"预处理Excel文件失败: {str(e)}")
-            
+            self.logger.error(f"预处理失败: {str(e)}", exc_info=True)
+            if isinstance(e, (FileOperationError, ExcelOperationError)):
+                raise
+            raise ExcelOperationError(f"预处理失败: {str(e)}")
+    
     def _process_sheets(self, workbook) -> None:
-        """处理工作表"""
-        for sheet in workbook.Sheets:
-            sheet_name = sheet.Name
-            if sheet_name in config.excel_config['sheets_to_keep']:
-                self.logger.info(f"处理工作表: {sheet_name}")
-                
-                # 1. 清理数据
-                self._clean_sheet_data(sheet)
-                
-                # 2. 处理公式
-                self._process_formulas(sheet)
-                
-                # 3. 处理格式
-                self._process_formats(sheet)
-                
-    def _clean_sheet_data(self, sheet) -> None:
-        """清理工作表数据"""
-        # 获取已使用区域
-        used_range = sheet.UsedRange
+        """
+        处理工作表
         
-        # 删除空行和空列
-        self._delete_empty_rows(used_range)
-        self._delete_empty_columns(used_range)
+        Args:
+            workbook: 工作簿对象
+        """
+        sheets_to_process = config.excel_config['sheets_to_keep']
+        processed_sheets = []
         
-    def _process_formulas(self, sheet) -> None:
-        """处理工作表中的公式"""
-        # 获取已使用区域
-        used_range = sheet.UsedRange
-        
-        # 将公式转换为值
-        used_range.Value = used_range.Value
-        
-    def _process_formats(self, sheet) -> None:
-        """处理工作表格式"""
-        # 获取已使用区域
-        used_range = sheet.UsedRange
-        
-        # 设置表头格式
-        header_row = used_range.Rows(1)
-        header_row.Font.Bold = True
-        header_row.Interior.Color = int(config.styles_config['header']['green'], 16)
-        
-    def _delete_empty_rows(self, used_range) -> None:
-        """删除空行"""
-        rows = used_range.Rows
-        for i in range(rows.Count, 0, -1):
-            row = rows.Item(i)
-            if not any(cell.Value for cell in row.Cells):
-                row.Delete()
+        # 处理所有可用的工作表
+        for sheet_name in sheets_to_process:
+            try:
+                sheet = workbook.Sheets(sheet_name)
                 
-    def _delete_empty_columns(self, used_range) -> None:
-        """删除空列"""
-        columns = used_range.Columns
-        for i in range(columns.Count, 0, -1):
-            column = columns.Item(i)
-            if not any(cell.Value for cell in column.Cells):
-                column.Delete()
+                # 确保所有公式都被计算
+                sheet.Calculate()
                 
+                # 获取使用范围
+                used_range = sheet.UsedRange
+                
+                # 复制整个范围
+                used_range.Copy()
+                
+                # 只粘贴值
+                used_range.PasteSpecial(Paste=-4163)  # xlPasteValues
+                
+                # 清除剪贴板
+                workbook.Application.CutCopyMode = False
+                
+                processed_sheets.append(sheet_name)
+                self.logger.info(f"已处理工作表: {sheet_name}")
+                
+            except Exception as e:
+                self.logger.error(f"处理工作表 {sheet_name} 时出错: {str(e)}")
+                # 继续处理其他工作表，不抛出异常
+                
+        # 如果没有成功处理任何工作表，尝试处理第一个工作表
+        if not processed_sheets:
+            try:
+                first_sheet = workbook.Sheets(1)
+                sheet_name = first_sheet.Name
+                
+                first_sheet.Calculate()
+                used_range = first_sheet.UsedRange
+                used_range.Copy()
+                used_range.PasteSpecial(Paste=-4163)
+                workbook.Application.CutCopyMode = False
+                
+                self.logger.warning(f"未找到配置的工作表，已处理第一个工作表: {sheet_name}")
+                processed_sheets.append(sheet_name)
+                
+            except Exception as e:
+                self.logger.error(f"处理第一个工作表时出错: {str(e)}")
+                raise ExcelOperationError(f"无法处理任何工作表: {str(e)}")
+    
     def _remove_unused_sheets(self, workbook) -> None:
-        """删除不需要的工作表"""
+        """
+        删除不需要的工作表
+        
+        Args:
+            workbook: 工作簿对象
+        """
         sheets_to_keep = config.excel_config['sheets_to_keep']
         
-        for sheet in workbook.Sheets:
-            if sheet.Name not in sheets_to_keep:
-                self.logger.info(f"删除工作表: {sheet.Name}")
-                sheet.Delete()
+        # 获取所有工作表名称
+        sheet_names = [sheet.Name for sheet in workbook.Sheets]
+        
+        # 如果没有找到任何需要保留的工作表，保留第一个工作表
+        if not any(name in sheets_to_keep for name in sheet_names):
+            self.logger.warning("未找到配置中指定的工作表，将保留第一个工作表")
+            sheets_to_keep = [sheet_names[0]]
+        
+        # 从后往前删除工作表，避免索引变化问题
+        for sheet_name in reversed(sheet_names):
+            try:
+                if sheet_name not in sheets_to_keep:
+                    sheet = workbook.Sheets(sheet_name)
+                    sheet.Delete()
+                    self.logger.debug(f"已删除工作表: {sheet_name}")
+            except Exception as e:
+                self.logger.warning(f"删除工作表 {sheet_name} 时出错: {str(e)}")
+                # 继续处理其他工作表，不抛出异常

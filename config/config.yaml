@@ -6,6 +6,8 @@ excel:
   date_format: '%Y%m%d_%H%M%S'
   
 feishu:
+  app_id: "cli_a63afccc31bc900b"  # 更新后的App ID
+  app_secret: "hJLJHYk64H6nCSz3aq77ThJnJUzkOAC5"  # 更新后的App Secret
   spreadsheet_token: 'MdJWsy8N6hLqq7tCz51cPxySntf'
   sheets:
     - sheet_id: 'RjyBZ8'  # S级产品
