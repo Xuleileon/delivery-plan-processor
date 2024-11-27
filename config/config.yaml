@@ -4,7 +4,15 @@ excel:
     - S级产品
     - 汇总
   date_format: '%Y%m%d_%H%M%S'
-  
+
+date:
+  input_formats:
+    - '%Y-%m-%d'
+    - '%Y/%m/%d'
+    - '%Y.%m.%d'
+    - '%Y年%m月%d日'
+  output_format: '%Y-%m-%d'
+
 feishu:
   app_id: "cli_a63afccc31bc900b"  # 更新后的App ID
   app_secret: "hJLJHYk64H6nCSz3aq77ThJnJUzkOAC5"  # 更新后的App Secret
@@ -16,17 +24,17 @@ feishu:
       sheet_name: '常规产品'
     - sheet_id: 'cxW3wO'  # 汇总
       sheet_name: '汇总'
-  
+
 styles:
   header:
     green: '1F6B3B'
     orange: 'F4B183'
-  
+
 logging:
   level: INFO
   format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
   file_pattern: 'logs/excel_processor_%Y%m%d.log'
-  
+
 output:
   directory: 'output'
   suffixes:

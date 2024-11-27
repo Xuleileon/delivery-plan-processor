@@ -151,7 +151,7 @@ class DeliveryPlanTransformer:
                                         continue
                                     elif isinstance(date, str):
                                         # 尝试多种日期格式
-                                        for fmt in config.date_config['input_formats']:
+                                        for fmt in config.get('date.input_formats', ['%Y-%m-%d']):
                                             try:
                                                 date = datetime.strptime(date, fmt).date()
                                                 break
@@ -218,7 +218,7 @@ class DeliveryPlanTransformer:
                                 continue
                             elif isinstance(col, str):
                                 # 尝试多种日期格式
-                                for fmt in config.date_config['input_formats']:
+                                for fmt in config.get('date.input_formats', ['%Y-%m-%d']):
                                     try:
                                         date = datetime.strptime(col, fmt).date()
                                         break
@@ -295,7 +295,7 @@ class DeliveryPlanTransformer:
                     sku_total += qty
                 
                 # 在最后添加dt列
-                row['dt'] = yesterday.strftime(config.date_config['output_format'])
+                row['dt'] = yesterday.strftime(config.get('date.output_format', '%Y-%m-%d'))
                 
                 total_qty += sku_total  # 累加到总数量
                 self.logger.debug(f"SKU {sku} 总数量: {sku_total}")
