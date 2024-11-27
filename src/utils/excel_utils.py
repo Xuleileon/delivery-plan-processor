@@ -5,14 +5,30 @@ import pandas as pd
 import openpyxl
 from openpyxl.styles import PatternFill, Alignment
 from copy import copy
+import sys
 
 def setup_logging():
     """设置日志配置"""
+    # 获取应用程序的基础路径
+    if getattr(sys, 'frozen', False):
+        # 如果是打包后的exe
+        base_path = Path(sys._MEIPASS)
+    else:
+        # 如果是开发环境
+        base_path = Path.cwd()
+    
+    # 创建logs目录
+    log_dir = base_path / 'logs'
+    log_dir.mkdir(exist_ok=True)
+    
+    # 设置日志文件路径
+    log_file = log_dir / f'excel_processor_{datetime.now():%Y%m%d}.log'
+    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(f'logs/excel_processor_{datetime.now():%Y%m%d}.log'),
+            logging.FileHandler(log_file),
             logging.StreamHandler()
         ]
     )
@@ -45,4 +61,4 @@ def copy_cell_format(source_cell, target_cell):
     target_cell.font = copy(source_cell.font)
     target_cell.border = copy(source_cell.border)
     target_cell.fill = copy(source_cell.fill)
-    target_cell.alignment = copy(source_cell.alignment) 
+    target_cell.alignment = copy(source_cell.alignment)
