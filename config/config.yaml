@@ -5,6 +5,16 @@ excel:
     - 汇总
   date_format: '%Y%m%d_%H%M%S'
   
+feishu:
+  spreadsheet_token: 'MdJWsy8N6hLqq7tCz51cPxySntf'
+  sheets:
+    - sheet_id: 'RjyBZ8'  # S级产品
+      sheet_name: 'S级产品'
+    - sheet_id: '64v01a'  # 常规产品
+      sheet_name: '常规产品'
+    - sheet_id: 'cxW3wO'  # 汇总
+      sheet_name: '汇总'
+  
 styles:
   header:
     green: '1F6B3B'
@@ -13,4 +23,11 @@ styles:
 logging:
   level: INFO
   format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-  file_pattern: 'logs/excel_processor_%Y%m%d.log' 
+  file_pattern: 'logs/excel_processor_%Y%m%d.log'
+  
+output:
+  directory: 'output'
+  suffixes:
+    preprocess: '_preprocessed'
+    transform: '_transformed'
+    merge: '_merged'

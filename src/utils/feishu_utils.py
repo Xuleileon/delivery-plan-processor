@@ -82,7 +82,7 @@ class FeishuSheetDownloader:
         if not self._tenant_access_token:
             self._tenant_access_token = self._get_tenant_access_token()
 
-        url = f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{spreadsheet_token}/sheets"
+        url = f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{spreadsheet_token}/metainfo"
         headers = {
             "Authorization": f"Bearer {self._tenant_access_token}",
             "Content-Type": "application/json; charset=utf-8"
@@ -96,7 +96,13 @@ class FeishuSheetDownloader:
             raise Exception(f"获取表格元数据失败: {result}")
             
         # 创建sheet_id到sheet_title的映射
-        sheet_names = {sheet["sheet_id"]: sheet["title"] for sheet in result["data"]["sheets"]}
+        sheets = result["data"]["sheets"]
+        sheet_names = {}
+        for sheet in sheets:
+            sheet_id = sheet.get("sheetId")
+            sheet_title = sheet.get("title")
+            if sheet_id and sheet_title:
+                sheet_names[sheet_id] = sheet_title
         return sheet_names
 
     def download_sheets(self, sheet_urls: List[str], save_path: Optional[str] = None) -> str:

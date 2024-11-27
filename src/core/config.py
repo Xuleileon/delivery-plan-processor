@@ -34,10 +34,17 @@ class ConfigManager:
             if config_path is None:
                 # 获取当前文件所在目录的父目录的父目录（项目根目录）
                 root_dir = Path(__file__).parent.parent.parent
-                config_path = os.path.join(root_dir, 'config', 'settings.yaml')
+                config_path = os.path.join(root_dir, 'config', 'config.yaml')
 
             with open(config_path, 'r', encoding='utf-8') as f:
                 self._config = yaml.safe_load(f)
+                
+            # 设置常用配置属性
+            self.excel_config = self._config.get('excel', {})
+            self.feishu_config = self._config.get('feishu', {})
+            self.styles_config = self._config.get('styles', {})
+            self.logging_config = self._config.get('logging', {})
+            self.output_config = self._config.get('output', {})
         except Exception as e:
             raise ConfigurationError(f"加载配置文件失败: {str(e)}")
 
@@ -57,28 +64,13 @@ class ConfigManager:
             for k in key.split('.'):
                 value = value[k]
             return value
-        except KeyError:
+        except (KeyError, TypeError):
             return default
 
-    @property
-    def excel_sheets(self) -> Dict[str, Any]:
-        """获取Excel工作表配置"""
-        return self.get('excel.sheets', {})
-
-    @property
-    def header_styles(self) -> Dict[str, Any]:
-        """获取表头样式配置"""
-        return self.get('excel.header_styles', {})
-
-    @property
-    def output_config(self) -> Dict[str, Any]:
-        """获取输出配置"""
-        return self.get('output', {})
-
-    @property
-    def date_formats(self) -> Dict[str, Any]:
-        """获取日期格式配置"""
-        return self.get('date', {})
+    def reload(self) -> None:
+        """重新加载配置"""
+        self._config = {}
+        self.load_config()
 
 # 全局配置管理器实例
 config = ConfigManager()
