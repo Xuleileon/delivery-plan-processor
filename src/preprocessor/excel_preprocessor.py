@@ -62,48 +62,71 @@ class ExcelPreprocessor:
         
         Args:
             workbook: 工作簿对象
+            
+        Raises:
+            ExcelOperationError: 工作表处理失败时抛出
         """
         sheets_to_process = config.excel_config['sheets_to_keep']
         processed_sheets = []
         
+        # 验证工作簿是否包含工作表
+        try:
+            if not workbook.Worksheets.Count:
+                raise ExcelOperationError("工作簿中没有工作表")
+        except Exception as e:
+            raise ExcelOperationError(f"无法访问工作表: {str(e)}")
+            
         # 处理所有可用的工作表
         for sheet_name in sheets_to_process:
             try:
-                sheet = workbook.Sheets(sheet_name)
+                # 使用Worksheets而不是Sheets
+                sheet = workbook.Worksheets(sheet_name)
                 
                 # 确保所有公式都被计算
-                sheet.Calculate()
+                try:
+                    sheet.Calculate()
+                except:
+                    self.logger.warning(f"工作表 {sheet_name} 的公式计算失败")
                 
-                # 获取使用范围
-                used_range = sheet.UsedRange
-                
-                # 复制整个范围
-                used_range.Copy()
-                
-                # 只粘贴值
-                used_range.PasteSpecial(Paste=-4163)  # xlPasteValues
-                
-                # 清除剪贴板
-                workbook.Application.CutCopyMode = False
+                # 获取使用范围并复制值
+                try:
+                    used_range = sheet.UsedRange
+                    if used_range:
+                        used_range.Copy()
+                        used_range.PasteSpecial(Paste=-4163)  # xlPasteValues
+                        workbook.Application.CutCopyMode = False
+                    else:
+                        self.logger.warning(f"工作表 {sheet_name} 没有数据")
+                except Exception as e:
+                    raise ExcelOperationError(f"复制工作表 {sheet_name} 数据失败: {str(e)}")
                 
                 processed_sheets.append(sheet_name)
                 self.logger.info(f"已处理工作表: {sheet_name}")
                 
             except Exception as e:
                 self.logger.error(f"处理工作表 {sheet_name} 时出错: {str(e)}")
-                # 继续处理其他工作表，不抛出异常
-                
+                # 如果是关键工作表，则抛出异常
+                if sheet_name in config.excel_config.get('required_sheets', []):
+                    raise ExcelOperationError(f"处理必需的工作表 {sheet_name} 失败: {str(e)}")
+        
         # 如果没有成功处理任何工作表，尝试处理第一个工作表
         if not processed_sheets:
             try:
-                first_sheet = workbook.Sheets(1)
+                first_sheet = workbook.Worksheets(1)
                 sheet_name = first_sheet.Name
                 
-                first_sheet.Calculate()
+                try:
+                    first_sheet.Calculate()
+                except:
+                    self.logger.warning(f"工作表 {sheet_name} 的公式计算失败")
+                
                 used_range = first_sheet.UsedRange
-                used_range.Copy()
-                used_range.PasteSpecial(Paste=-4163)
-                workbook.Application.CutCopyMode = False
+                if used_range:
+                    used_range.Copy()
+                    used_range.PasteSpecial(Paste=-4163)
+                    workbook.Application.CutCopyMode = False
+                else:
+                    raise ExcelOperationError(f"工作表 {sheet_name} 没有数据")
                 
                 self.logger.warning(f"未找到配置的工作表，已处理第一个工作表: {sheet_name}")
                 processed_sheets.append(sheet_name)

@@ -6,7 +6,7 @@ from openpyxl.styles import PatternFill
 from src.core.config import config
 from src.core.exceptions import FileOperationError, DataTransformError
 from src.utils.excel_utils import generate_output_path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import re
 
 class DeliveryPlanTransformer:
@@ -107,10 +107,10 @@ class DeliveryPlanTransformer:
                 sku = None
                 for col_name in ['sku编码', 'SKU编码', 'sku_no']:
                     if col_name in row.index:
-                        sku = row[col_name]
+                        sku = str(row[col_name]).strip()
                         break
                 
-                if sku is None or pd.isna(sku):
+                if not sku or pd.isna(sku) or sku == '0' or sku == '':
                     continue
                     
                 if sku not in regular_data:
@@ -142,18 +142,35 @@ class DeliveryPlanTransformer:
                             date = row[date_col]
                             qty = row[qty_col]
                             if pd.notna(date) and pd.notna(qty):
-                                # 确保日期是datetime.date类型
-                                if isinstance(date, datetime):
-                                    date = date.date()
-                                elif isinstance(date, str):
-                                    date = pd.to_datetime(date).date()
+                                # 尝试转换日期
+                                try:
+                                    if isinstance(date, datetime):
+                                        date = date.date()
+                                    elif isinstance(date, time):
+                                        # 如果是time类型，跳过这个值
+                                        continue
+                                    elif isinstance(date, str):
+                                        # 尝试多种日期格式
+                                        for fmt in config.date_config['input_formats']:
+                                            try:
+                                                date = datetime.strptime(date, fmt).date()
+                                                break
+                                            except ValueError:
+                                                continue
+                                        else:
+                                            raise ValueError(f"无效的日期格式: {date}")
+                                    else:
+                                        raise ValueError(f"无效的日期类型: {type(date)}")
+                                except Exception as e:
+                                    raise DataTransformError(f"日期转换失败: {str(e)}")
                                 
                                 # 如果日期已存在，累加数量
                                 if date in regular_data[sku]['dates']:
                                     regular_data[sku]['dates'][date] += float(qty)
                                 else:
                                     regular_data[sku]['dates'][date] = float(qty)
-                        except (ValueError, TypeError):
+                        except (ValueError, TypeError) as e:
+                            self.logger.warning(f"处理常规产品数据时出错: SKU={sku}, 日期={date_col}, 数量={qty_col}, 错误={str(e)}")
                             continue
             
             # 处理S级产品数据
@@ -163,10 +180,10 @@ class DeliveryPlanTransformer:
                 sku = None
                 for col_name in ['sku编码', 'SKU编码', 'sku_no']:
                     if col_name in row.index:
-                        sku = row[col_name]
+                        sku = str(row[col_name]).strip()
                         break
                 
-                if sku is None or pd.isna(sku):
+                if not sku or pd.isna(sku) or sku == '0' or sku == '':
                     continue
                     
                 if sku not in s_level_data:
@@ -192,15 +209,27 @@ class DeliveryPlanTransformer:
                 # 处理日期和数量
                 for col in s_level_df.columns:
                     try:
-                        if isinstance(col, datetime):
-                            date = col.date()
-                        elif isinstance(col, str):
-                            try:
-                                date = pd.to_datetime(col).date()
-                            except:
+                        # 尝试转换日期列
+                        try:
+                            if isinstance(col, datetime):
+                                date = col.date()
+                            elif isinstance(col, time):
+                                # 如果是time类型，跳过这个列
                                 continue
-                        else:
-                            continue
+                            elif isinstance(col, str):
+                                # 尝试多种日期格式
+                                for fmt in config.date_config['input_formats']:
+                                    try:
+                                        date = datetime.strptime(col, fmt).date()
+                                        break
+                                    except ValueError:
+                                        continue
+                                else:
+                                    continue  # 不是日期列，跳过
+                            else:
+                                continue  # 不是日期列，跳过
+                        except Exception:
+                            continue  # 日期转换失败，跳过
                             
                         qty = row[col]
                         if pd.notna(qty):
@@ -209,7 +238,8 @@ class DeliveryPlanTransformer:
                                 s_level_data[sku]['dates'][date] += float(qty)
                             else:
                                 s_level_data[sku]['dates'][date] = float(qty)
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as e:
+                        self.logger.warning(f"处理S级产品数据时出错: SKU={sku}, 列={col}, 错误={str(e)}")
                         continue
             
             # 合并所有数据
@@ -250,9 +280,6 @@ class DeliveryPlanTransformer:
             total_qty = 0  # 用于跟踪总数量
             
             for sku, data in all_data.items():
-                if str(sku).strip() == '0' or str(sku).strip() == '':
-                    continue
-                    
                 row = {
                     'sku_no': sku,
                     'color': data['color'] or '',
@@ -268,35 +295,45 @@ class DeliveryPlanTransformer:
                     sku_total += qty
                 
                 # 在最后添加dt列
-                row['dt'] = yesterday.strftime('%Y-%m-%d')
+                row['dt'] = yesterday.strftime(config.date_config['output_format'])
                 
                 total_qty += sku_total  # 累加到总数量
                 self.logger.debug(f"SKU {sku} 总数量: {sku_total}")
                 result_data.append(row)
             
-            result_df = pd.DataFrame(result_data)
+            # 如果没有数据，创建一个空的DataFrame
+            if not result_data:
+                columns = ['sku_no', 'color', 'size'] + [f'day{i}' for i in range(1, 61)] + ['dt']
+                result_df = pd.DataFrame(columns=columns)
+            else:
+                result_df = pd.DataFrame(result_data)
             
             # 确保所有数值列为float类型
             date_cols = [f'day{i}' for i in range(1, 61)]
             for col in date_cols:
-                result_df[col] = pd.to_numeric(result_df[col], errors='coerce').fillna(0.0)
+                if col not in result_df.columns:
+                    result_df[col] = 0.0
+                else:
+                    result_df[col] = pd.to_numeric(result_df[col], errors='coerce').fillna(0.0)
             
             # 打印数据总和
             total_sum = result_df[date_cols].sum().sum()
-            day1_sum = result_df['day1'].sum()
+            day1_sum = result_df['day1'].sum() if 'day1' in result_df.columns else 0
             self.logger.info(f"转换后数据总和: {total_sum}")
             self.logger.info(f"转换后day1总和: {day1_sum}")
             
             # 打印每个SKU的数据
             for _, row in result_df.iterrows():
                 sku = row['sku_no']
-                sku_sum = sum(row[col] for col in date_cols)
+                sku_sum = sum(row[col] for col in date_cols if col in row)
                 self.logger.debug(f"SKU {sku} 转换后总和: {sku_sum}")
             
             return result_df
             
         except Exception as e:
             self.logger.error(f"转换格式失败: {str(e)}", exc_info=True)
+            if isinstance(e, DataTransformError):
+                raise
             raise DataTransformError(f"转换格式失败: {str(e)}")
     
     def _save_result(self, df: pd.DataFrame, output_path: Path) -> None:

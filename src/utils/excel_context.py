@@ -30,35 +30,41 @@ def excel_context(visible: bool = False, display_alerts: bool = False):
         # 初始化COM
         pythoncom.CoInitialize()
         
-        # 使用GetActiveObject尝试获取已存在的Excel实例
         try:
-            excel = win32com.client.GetActiveObject('Excel.Application')
-            logger.debug("已获取现有Excel实例")
-        except:
-            # 如果没有现有实例，创建新的
+            # 尝试使用DispatchEx创建新实例
             excel = win32com.client.DispatchEx('Excel.Application')
             logger.debug("已创建新的Excel实例")
-        
-        excel.DisplayAlerts = display_alerts
-        excel.Visible = visible
-        yield excel
+            
+            # 设置Excel应用程序属性
+            excel.DisplayAlerts = display_alerts
+            excel.Visible = visible
+            excel.ScreenUpdating = False  # 禁用屏幕更新以提高性能
+            
+            yield excel
+            
+        except pythoncom.com_error as e:
+            raise ExcelOperationError(f"创建Excel实例失败: {str(e)}")
+            
     except Exception as e:
-        raise ExcelOperationError(f"Excel操作失败: {str(e)}")
+        if not isinstance(e, ExcelOperationError):
+            raise ExcelOperationError(f"Excel操作失败: {str(e)}")
+        raise
+        
     finally:
         if excel:
             try:
+                excel.ScreenUpdating = True
+                excel.DisplayAlerts = True
                 # 关闭所有打开的工作簿
                 for wb in excel.Workbooks:
                     try:
                         wb.Close(SaveChanges=False)
                     except:
-                        pass
+                        logger.warning("关闭工作簿时出错")
                 excel.Quit()
-                logger.debug("Excel应用程序已关闭")
             except:
-                logger.warning("关闭Excel应用程序时出错", exc_info=True)
+                logger.warning("关闭Excel应用程序时出错")
             finally:
-                # 取消初始化COM
                 pythoncom.CoUninitialize()
 
 @contextmanager
@@ -81,20 +87,41 @@ def workbook_context(excel_app, file_path: str, read_only: bool = False):
     try:
         # 确保文件路径是绝对路径
         abs_path = str(Path(file_path).absolute())
-        workbook = excel_app.Workbooks.Open(
-            abs_path,
-            ReadOnly=read_only,
-            UpdateLinks=False,  # 不更新链接
-            IgnoreReadOnlyRecommended=True  # 忽略只读推荐
-        )
-        logger.debug(f"已打开工作簿: {abs_path}")
-        yield workbook
+        
+        # 检查文件是否被锁定
+        try:
+            with open(abs_path, 'rb') as f:
+                pass
+        except IOError:
+            raise ExcelOperationError(f"文件被锁定或无法访问: {abs_path}")
+            
+        try:
+            workbook = excel_app.Workbooks.Open(
+                abs_path,
+                ReadOnly=read_only,
+                UpdateLinks=False,
+                IgnoreReadOnlyRecommended=True,
+                CorruptLoad=2  # xlRepairFile
+            )
+            logger.debug(f"已打开工作簿: {abs_path}")
+            
+            # 验证工作簿是否正确打开
+            if not workbook or not hasattr(workbook, 'Worksheets'):
+                raise ExcelOperationError("工作簿打开失败或格式无效")
+                
+            yield workbook
+            
+        except pythoncom.com_error as e:
+            raise ExcelOperationError(f"打开工作簿失败: {str(e)}")
+            
     except Exception as e:
-        raise ExcelOperationError(f"打开工作簿失败: {str(e)}")
+        if not isinstance(e, ExcelOperationError):
+            raise ExcelOperationError(f"工作簿操作失败: {str(e)}")
+        raise
+        
     finally:
         if workbook:
             try:
                 workbook.Close(SaveChanges=False)
-                logger.debug(f"已关闭工作簿: {file_path}")
             except:
-                logger.warning("关闭工作簿时出错", exc_info=True)
+                logger.warning("关闭工作簿时出错")
